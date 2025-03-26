@@ -1,0 +1,19 @@
+services:  
+  project:  
+    build:  
+      context: .  
+      dockerfile: project/Dockerfile  # или укажите правильный путь к вашему Dockerfile для проекта  
+    volumes:  
+      - ./project:/app/project  
+    ports:  
+      - "8001:8001"  
+
+  user:  
+    build:  
+      context: .  
+      dockerfile: user/Dockerfile  # или укажите правильный путь к вашему Dockerfile для пользователей  
+    volumes:  
+      - ./users:/app/users  
+      - ./project:/app/project
+    ports:  
+      - "8000:8000"  
