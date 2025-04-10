@@ -1,6 +1,4 @@
-# АБС (Автоматизированная банковская система) – для хранения и обработки
-# документов
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, Path, status
+from fastapi import FastAPI, HTTPException, Depends, Query, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from models.models import User
 from sqlalchemy.orm import defer
@@ -29,7 +27,7 @@ async def get_db():
 
 app = FastAPI()
 
-@app.post("/register/")
+@app.post("/api/v1/user/register/")
 async def register_user(first_name: str,
                         last_name: str,
                         username: str,
@@ -197,4 +195,4 @@ async def delete_user(
     return {"message": "Пользователь успешно удален"}
 
 if __name__ == "__main__":
-    uvicorn.run("user_service:app", reload=True)
+    uvicorn.run("serv_user.user_service:app", reload=True)

@@ -1,19 +1,18 @@
-# АБС (Автоматизированная банковская система) – для хранения и обработки
-# документов
 from sqlalchemy.orm import defer
 from sqlalchemy.future import select
-from fastapi import APIRouter, HTTPException, Depends, status
-from fastapi.security import OAuth2PasswordBearer
-from models import Task, User
-from database import SessionLocal
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from models.models import Task, User
+from database.database import SessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
 from auth.jwt_token import decode_token
-from datetime import datetime
+from auth.jwt_token import create_access_token
+from auth.auth_user import authenticate_user
+from datetime import timedelta, datetime
 from typing import Optional, List
+import uvicorn
 
-router = APIRouter(
-    prefix="/api/v1/Task", 
-    tags=["Task"])
+app = FastAPI()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
 
@@ -25,8 +24,21 @@ async def get_db():
         finally:
             await db.close()
 
+@app.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends(),
+                db: AsyncSession = Depends(get_db)):
+    user = await authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Неверный логин или пароль",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = await create_access_token(data={"sub": user.username},
+                                             expires_delta=timedelta(minutes=30))
+    return {"access_token": access_token, "token_type": "bearer"}
 
-@router.post("/task_create/")
+@app.post("/api/v1/Task/task_create/")
 async def create_task(
                         project_id: int,
                         code: str,
@@ -59,7 +71,7 @@ async def create_task(
 
 
 # Read (GET) - Получение проекта по ID
-@router.get("/get_task/{code_task}")
+@app.get("/api/v1/Task/get_task/{code_task}")
 async def get_task_code(
                         task_code: str,
                         token: str = Depends(oauth2_scheme),
@@ -72,7 +84,7 @@ async def get_task_code(
     return project
 
 
-@router.get("/all_tasks")
+@app.get("/api/v1/Task/all_tasks")
 async def get_all_task(token: str = Depends(oauth2_scheme),
                        db: AsyncSession = Depends(get_db)):
     query = await db.execute(select(Task))
@@ -82,7 +94,7 @@ async def get_all_task(token: str = Depends(oauth2_scheme),
     return {"contract_list": task}
 
 
-@router.put("/update_task/{task_id}")
+@app.put("/api/v1/Task/update_task/{task_id}")
 async def update_task(
     task_id: int,
     title: Optional[str] = None,
@@ -111,7 +123,7 @@ async def update_task(
     return {"message": "Задача успешно обновлена"}
 
 
-@router.delete("/delete_task/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/api/v1/Task/delete_task/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_task(
     task_id: int,
     db: AsyncSession = Depends(get_db),
@@ -134,3 +146,6 @@ async def delete_task(
     await db.commit()
     
     return {"message": "Задача успешно удалена"}
+
+if __name__ == "__main__":
+    uvicorn.run("serv_task.Task_service:app", reload=True)

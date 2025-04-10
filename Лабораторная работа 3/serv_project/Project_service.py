@@ -1,17 +1,18 @@
 from sqlalchemy.orm import defer
 from sqlalchemy.future import select
-from fastapi import APIRouter, HTTPException, Depends, status
-from fastapi.security import OAuth2PasswordBearer
-from models import Project
-from database import SessionLocal
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from models.models import Project, User
+from database.database import SessionLocal
 from sqlalchemy.ext.asyncio import AsyncSession
 from auth.jwt_token import decode_token
-from datetime import datetime
+from auth.jwt_token import create_access_token
+from auth.auth_user import authenticate_user
+from datetime import timedelta, datetime
 from typing import Optional, List
+import uvicorn
 
-router = APIRouter(
-    prefix="/api/v1/Project",
-    tags=["Project"])
+app = FastAPI()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
 
@@ -23,15 +24,23 @@ async def get_db():
         finally:
             await db.close()
 
-router = APIRouter(
-    prefix="/api/v1/Project",
-    tags=["Project"])
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
+@app.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends(),
+                db: AsyncSession = Depends(get_db)):
+    user = await authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Неверный логин или пароль",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = await create_access_token(data={"sub": user.username},
+                                             expires_delta=timedelta(minutes=30))
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 # Create (POST) - Создание нового проекта
-@router.post("/project_create/")
+@app.post("/api/v1/Project/project_create/")
 async def create_project(
                         name: str,
                         description: str = None,
@@ -58,7 +67,7 @@ async def create_project(
 
 
 # Read (GET) - Получение проекта по ID
-@router.get("/get_project/{project_name}")
+@app.get("/api/v1/Project/get_project/{project_name}")
 async def read_project(
                         project_name: str,
                         token: str = Depends(oauth2_scheme),
@@ -71,7 +80,7 @@ async def read_project(
     return project
 
 
-@router.get("/all_project")
+@app.get("/api/v1/Project/all_project")
 async def get_all_project(token: str = Depends(oauth2_scheme),
                           db: AsyncSession = Depends(get_db)):
     query = await db.execute(select(Project))
@@ -81,7 +90,7 @@ async def get_all_project(token: str = Depends(oauth2_scheme),
     return {"contract_list": projects}
 
 
-@router.put("/update_project/{project_id}")
+@app.put("/api/v1/Project/update_project/{project_id}")
 async def update_project(
     project_id: int,
     name: Optional[str] = None,
@@ -109,7 +118,7 @@ async def update_project(
     return {"message": "Проект успешно обновлен"}
 
 
-@router.delete("/delete_project/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/api/v1/Project/delete_project/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
     project_id: int,
     db: AsyncSession = Depends(get_db),
@@ -132,3 +141,6 @@ async def delete_project(
     await db.commit()
     
     return {"message": "Проект успешно удален"}
+
+if __name__ == "__main__":
+    uvicorn.run("serv_project.Project_service:app", reload=True)
