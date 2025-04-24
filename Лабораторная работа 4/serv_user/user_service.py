@@ -195,4 +195,4 @@ async def delete_user(
     return {"message": "Пользователь успешно удален"}
 
 if __name__ == "__main__":
-    uvicorn.run("serv_user.user_service:app", reload=True, port=8001)
+    uvicorn.run("serv_user.user_service:app", host="0.0.0.0", port=8001)

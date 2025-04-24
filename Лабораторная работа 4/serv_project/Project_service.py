@@ -124,4 +124,4 @@ async def delete_project(
 
 
 if __name__ == "__main__":
-    uvicorn.run("serv_project.Project_service:app", reload=True, port=8002)
+    uvicorn.run("serv_project.Project_service:app", host="0.0.0.0", port=8002)

@@ -148,4 +148,4 @@ async def delete_task(
     return {"message": "Задача успешно удалена"}
 
 if __name__ == "__main__":
-    uvicorn.run("serv_task.Task_service:app", reload=True, port=8003)
+    uvicorn.run("serv_task.Task_service:app", host="0.0.0.0", port=8003)
