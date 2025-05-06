@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  redis:  # Новый сервис Redis
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: Alexs
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: Lab3
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U Alexs -d Lab3"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongodb:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  db_init:
+    build:
+      context: .
+      dockerfile: script_db/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: Lab3
+      DB_USER: Alexs
+      DB_PASSWORD: root
+
+  serv_user:
+    build:
+      context: .
+      dockerfile: serv_user/Dockerfile
+    ports:
+      - "8001:8001"
+    depends_on:
+      - postgres
+      - db_init
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: Lab3
+      DB_USER: Alexs
+      DB_PASSWORD: root
+      REDIS_URL: "redis://redis:6379"  # Добавляем переменную для подключения
+
+  serv_project:
+    build:
+      context: .
+      dockerfile: serv_project/Dockerfile
+    ports:
+      - "8002:8002"
+    depends_on:
+      - postgres
+      - mongodb
+      - db_init
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: Lab3
+      DB_USER: Alexs
+      DB_PASSWORD: root
+      MONGO_URL: "mongodb://mongodb:27017"
+      MONGO_DB_NAME: "project_db"
+      REDIS_URL: "redis://redis:6379"  # Добавляем переменную для подключения
+
+  serv_task:
+    build:
+      context: .
+      dockerfile: serv_task/Dockerfile
+    ports:
+      - "8003:8003"
+    depends_on:
+      - postgres
+      - db_init
+      - redis  # Добавляем зависимость от Redis
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: Lab3
+      DB_USER: Alexs
+      DB_PASSWORD: root
+      REDIS_URL: "redis://redis:6379"  # Добавляем переменную для подключения
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:  # Добавляем том для Redis
+
